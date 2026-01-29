@@ -5,7 +5,7 @@ Local test of the pilot scheduler - no LAMMPS needed.
 This creates simple sleep tasks to verify:
 1. Parallel execution works
 2. Tasks cycle (new starts when old finishes)
-3. Active learning callback works
+3. Dynamic task generation callback works
 
 Run: python tests/test_local.py
 """
@@ -54,13 +54,13 @@ def test_basic_parallel():
     print()
 
 
-def test_active_learning():
-    """Test dynamic task generation (active learning callback)."""
+def test_dynamic_generation():
+    """Test dynamic task generation callback."""
     print("=" * 60)
-    print("TEST: Active Learning (Dynamic Task Generation)")
+    print("TEST: Dynamic Task Generation")
     print("=" * 60)
 
-    pilot = Pilot(total_cores=4, workdir="./test_runs/active_learning")
+    pilot = Pilot(total_cores=4, workdir="./test_runs/dynamic_generation")
 
     # Start with 2 tasks
     initial_tasks = [
@@ -71,7 +71,7 @@ def test_active_learning():
 
     generated_count = [0]  # Use list to allow modification in callback
 
-    def active_learning_callback(task, result, p):
+    def dynamic_callback(task, result, p):
         """Generate new task if result is interesting."""
         # Read stdout to check if interesting
         try:
@@ -79,7 +79,7 @@ def test_active_learning():
             if "INTERESTING" in stdout and generated_count[0] < 3:
                 generated_count[0] += 1
                 new_id = f"generated_{generated_count[0]}"
-                print(f"  [AL] Task {task.id} was interesting → generating {new_id}")
+                print(f"  [Callback] Task {task.id} was interesting → generating {new_id}")
                 return [Task(
                     id=new_id,
                     command=f"echo 'Generated task {generated_count[0]}' && sleep 0.3",
@@ -90,7 +90,7 @@ def test_active_learning():
             pass
         return None
 
-    pilot.on_complete(active_learning_callback)
+    pilot.on_complete(dynamic_callback)
 
     print(f"Initial tasks: {len(initial_tasks)}")
     print(f"Callback will generate up to 3 new tasks")
@@ -212,7 +212,7 @@ def main():
 
     tests = [
         test_basic_parallel,
-        test_active_learning,
+        test_dynamic_generation,
         test_priority_ordering,
         test_failure_handling,
         test_persistence,

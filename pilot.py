@@ -371,7 +371,7 @@ class Pilot:
                             )
                             self.db.commit()
 
-                        # Callbacks (for active learning)
+                        # Callbacks (for adaptive workflows)
                         for cb in self.on_complete_callbacks:
                             try:
                                 new_tasks = cb(task, result, self)

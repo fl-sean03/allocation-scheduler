@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-LAMMPS Active Learning Example
+LAMMPS Adaptive Sweep Example
 
 Demonstrates:
 1. Initial temperature sweep (exploration)
-2. Dynamic task generation based on results (exploitation)
+2. Dynamic task generation based on results (adaptive refinement)
 3. Parallel execution on HPC
 
 Usage:
@@ -47,7 +47,7 @@ TASK_TIMEOUT = 300      # 5 minutes per simulation
 # =============================================================================
 
 LAMMPS_INPUT_TEMPLATE = """# Liquid Argon MD - Temperature {temperature}K
-# For allocation scheduler active learning demo
+# For allocation scheduler adaptive sweep demo
 # Source: Rahman, Phys. Rev. 136, A405 (1964)
 
 units           real
@@ -144,7 +144,7 @@ def generate_initial_tasks() -> List[Task]:
 
 
 # =============================================================================
-# Active Learning Callback
+# Adaptive Refinement Callback
 # =============================================================================
 
 # Track what we've done
@@ -170,7 +170,7 @@ def parse_msd_from_output(result: TaskResult) -> Optional[float]:
 
 def on_task_complete(task: Task, result: TaskResult, pilot: Pilot) -> Optional[List[Task]]:
     """
-    Active learning callback - decide whether to explore nearby temperatures.
+    Adaptive refinement callback - decide whether to explore nearby temperatures.
 
     This is called after each task completes.
     """
@@ -186,7 +186,7 @@ def on_task_complete(task: Task, result: TaskResult, pilot: Pilot) -> Optional[L
     # Parse MSD
     msd = parse_msd_from_output(result)
     if msd is None:
-        print(f"  [AL] Could not parse MSD for T={temperature}")
+        print(f"  [Adaptive] Could not parse MSD for T={temperature}")
         return None
 
     results_history.append({
@@ -195,16 +195,16 @@ def on_task_complete(task: Task, result: TaskResult, pilot: Pilot) -> Optional[L
         "task_id": task.id,
     })
 
-    print(f"  [AL] T={temperature}K, MSD={msd:.2f}")
+    print(f"  [Adaptive] T={temperature}K, MSD={msd:.2f}")
 
     # Check task limit
     total_done = len(pilot.completed) + len(pilot.failed)
     total_pending = pilot.pending.qsize() + len(pilot.running)
     if total_done + total_pending >= MAX_TASKS:
-        print(f"  [AL] Reached max tasks ({MAX_TASKS})")
+        print(f"  [Adaptive] Reached max tasks ({MAX_TASKS})")
         return None
 
-    # Active learning decision: refine around interesting temperatures
+    # Adaptive refinement: explore around interesting temperatures
     # "Interesting" = high MSD (high diffusion region)
     if len(results_history) < 3:
         return None  # Need more data
@@ -221,7 +221,7 @@ def on_task_complete(task: Task, result: TaskResult, pilot: Pilot) -> Optional[L
             if T_MIN <= new_T <= T_MAX and new_T not in explored_temperatures:
                 explored_temperatures.add(new_T)
                 new_tasks.append(create_task(new_T, "refinement"))
-                print(f"  [AL] → Refining at T={new_T}K")
+                print(f"  [Adaptive] → Refining at T={new_T}K")
 
         return new_tasks if new_tasks else None
 
@@ -234,7 +234,7 @@ def on_task_complete(task: Task, result: TaskResult, pilot: Pilot) -> Optional[L
 
 def main():
     """Generate initial tasks and write to JSON."""
-    print("LAMMPS Active Learning Task Generator")
+    print("LAMMPS Adaptive Sweep Task Generator")
     print("=" * 50)
 
     # Generate initial tasks
@@ -251,8 +251,8 @@ def main():
     print(f"\nWrote: {output_path}")
 
     # Write callback module
-    callback_path = Path(__file__).parent.parent / "active_learning_callback.py"
-    callback_code = '''"""Active learning callback - import into pilot."""
+    callback_path = Path(__file__).parent.parent / "adaptive_callback.py"
+    callback_code = '''"""Adaptive refinement callback - import into pilot."""
 from examples.lammps_adaptive_sweep import on_task_complete
 '''
     with open(callback_path, 'w') as f:

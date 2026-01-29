@@ -3,7 +3,7 @@
 Dynamic Task Generation Example
 
 Demonstrates adding tasks based on results using callbacks.
-This is useful for adaptive workflows, active learning, etc.
+This is useful for adaptive workflows, iterative refinement, etc.
 
 Usage:
     python examples/dynamic_tasks.py
@@ -74,8 +74,7 @@ def on_task_complete(task: Task, result: TaskResult, pilot: Pilot) -> Optional[L
     """
     Adaptive callback - explore near high-value results.
 
-    This mimics active learning: if we find an interesting region,
-    sample more densely around it.
+    If we find an interesting region, sample more densely around it.
     """
     if not result.success:
         return None
