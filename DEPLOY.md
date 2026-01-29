@@ -1,223 +1,301 @@
 # Deployment Guide
 
-## Quick Start (Any SLURM Cluster)
+Complete step-by-step instructions for deploying the Allocation Scheduler on your HPC cluster.
 
-### 1. Upload to Cluster
+---
 
-```bash
-# From local machine
-scp -r allocation-scheduler/ user@cluster:/scratch/$USER/
-```
+## Step 1: Configure for Your Cluster (Local Machine)
 
-### 2. Test Locally on Login Node
+Before transferring files, edit `submit.sh` to match your cluster's configuration.
 
-```bash
-ssh user@cluster
-cd /scratch/$USER/allocation-scheduler
-
-# Generate simple test tasks
-python3 examples/simple_tasks.py
-
-# Run with 2 cores (quick test)
-python3 pilot.py --cores 2 --tasks tasks.json --workdir ./test_run
-```
-
-### 3. Submit to Queue
+### 1.1 Open submit.sh and update SLURM directives
 
 ```bash
-# Edit submit.sh for your cluster's partitions
-nano submit.sh
-
-# Submit
-sbatch submit.sh
-
-# Monitor
-tail -f pilot_*.out
+#SBATCH --partition=YOUR_PARTITION   # e.g., compute, batch, normal
+#SBATCH --qos=YOUR_QOS               # Add this line if your cluster requires QoS
+#SBATCH --nodes=1
+#SBATCH --ntasks=16                  # Total cores you want
+#SBATCH --time=4:00:00               # Wall time (HH:MM:SS)
 ```
 
-## Customization
+**Common partition names by cluster:**
+- TACC (Stampede, Frontera): `normal`, `development`
+- NERSC (Perlmutter): `regular`, `debug`
+- CU Boulder (Alpine): `amilan`, `atesting`
+- Generic PBS/Torque: May need different script format
 
-### Your Own Task Generator
+### 1.2 Add environment setup (if needed)
 
-Create a Python script that generates `tasks.json`:
-
-```python
-from pilot import Task
-import json
-
-tasks = []
-for i in range(100):
-    tasks.append(Task(
-        id=f"task_{i}",
-        command=f"./my_program --input data_{i}.txt",
-        cores=4,
-        timeout=3600,
-    ))
-
-with open("tasks.json", "w") as f:
-    json.dump([t.to_dict() for t in tasks], f)
-```
-
-### Multi-Core Tasks
-
-For tasks using MPI or threads:
-
-```python
-Task(
-    id="mpi_task",
-    command="mpirun -np 4 ./solver input.dat",
-    cores=4,  # Reserve 4 cores
-)
-```
-
-### Different Partitions
-
-Edit the SBATCH directives in `submit.sh`:
+If your tasks require specific software (Python packages, LAMMPS, etc.), uncomment and edit the environment section:
 
 ```bash
-#SBATCH --partition=gpu      # GPU partition
-#SBATCH --gres=gpu:1         # Request GPU
-#SBATCH --ntasks=8
-#SBATCH --time=24:00:00
-```
+# For conda environments:
+source /path/to/miniconda3/etc/profile.d/conda.sh
+conda activate your_env
 
-### Conda/Module Environment
-
-Add to submit script:
-
-```bash
-# Conda
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate myenv
-
-# Or modules
+# For module systems:
 module load python/3.9
 module load openmpi/4.1
 ```
 
-## Crash Recovery
+### 1.3 Save your changes
 
-If your job times out or crashes:
+---
+
+## Step 2: Transfer Files to Cluster
+
+Choose your preferred transfer method:
+
+### Option A: Command Line (scp/rsync)
 
 ```bash
-# Submit new job with --resume
-sbatch submit_resume.sh
+# Using scp (simple)
+scp -r allocation-scheduler/ username@cluster.edu:/scratch/username/
+
+# Using rsync (better for updates)
+rsync -avz allocation-scheduler/ username@cluster.edu:/scratch/username/allocation-scheduler/
 ```
 
-Where `submit_resume.sh` contains:
+### Option B: Globus
+
+1. Log in to [Globus](https://app.globus.org/)
+2. Set source: Your local machine (Globus Connect Personal)
+3. Set destination: Your cluster's Globus endpoint
+4. Navigate to the `allocation-scheduler/` folder
+5. Click "Start" to transfer
+
+### Option C: GUI Tools (WinSCP, FileZilla, Cyberduck)
+
+1. Connect to your cluster via SFTP
+   - Host: `cluster.edu`
+   - Username: your username
+   - Port: 22
+2. Navigate to your scratch/work directory
+3. Drag and drop the `allocation-scheduler/` folder
+
+### Option D: Git Clone (if you pushed to a repo)
+
 ```bash
-python3 pilot.py --cores $SLURM_NTASKS --db state_OLDJOBID.db --resume
+# SSH to cluster first, then:
+cd /scratch/$USER
+git clone https://github.com/yourusername/allocation-scheduler.git
 ```
+
+---
+
+## Step 3: Generate Tasks (On Cluster)
+
+SSH into your cluster and navigate to the project directory:
+
+```bash
+ssh username@cluster.edu
+cd /scratch/username/allocation-scheduler
+```
+
+### 3.1 Choose a task generator
+
+**Option A: Simple test tasks (no dependencies)**
+```bash
+python examples/simple_tasks.py
+```
+
+**Option B: Parameter sweep**
+```bash
+python examples/parameter_sweep.py
+```
+
+**Option C: LAMMPS tasks (requires LAMMPS installed)**
+```bash
+# Activate your LAMMPS environment first
+conda activate lammps_env  # or load modules
+
+python examples/lammps_active_learning.py
+```
+
+**Option D: Create tasks.json manually**
+```bash
+cat > tasks.json << 'EOF'
+[
+  {"id": "run_1", "command": "./my_program --input file1.dat", "cores": 2},
+  {"id": "run_2", "command": "./my_program --input file2.dat", "cores": 2},
+  {"id": "run_3", "command": "./my_program --input file3.dat", "cores": 2}
+]
+EOF
+```
+
+### 3.2 Verify tasks.json was created
+
+```bash
+cat tasks.json
+# Should show your task definitions
+```
+
+---
+
+## Step 4: Submit the Job
+
+```bash
+sbatch submit.sh
+```
+
+**Expected output:**
+```
+Submitted batch job 12345678
+```
+
+### 4.1 Monitor the job
+
+```bash
+# Check queue status
+squeue -u $USER
+
+# Watch output in real-time
+tail -f pilot_*.out
+
+# Or check stderr for scheduler logs
+tail -f pilot_*.err
+```
+
+### 4.2 Expected scheduler output
+
+```
+============================================================
+ALLOCATION SCHEDULER
+============================================================
+Job ID:      12345678
+Partition:   compute
+Cores:       16
+Start:       Mon Jan 28 10:00:00 MST 2026
+============================================================
+Tasks file: tasks.json
+Task count: 10
+
+10:00:01 [INFO] ▶ run_1 (2c) [14/16 free]
+10:00:01 [INFO] ▶ run_2 (2c) [12/16 free]
+10:00:01 [INFO] ▶ run_3 (2c) [10/16 free]
+...
+10:00:15 [INFO] ✓ run_1 (14.2s)
+10:00:15 [INFO] ▶ run_4 (2c) [10/16 free]
+...
+============================================================
+FINISHED
+============================================================
+Completed: 10
+Failed: 0
+Wall time: 45.3s
+```
+
+---
+
+## Step 5: Check Results
+
+After the job completes:
+
+```bash
+# View summary
+cat runs_12345678/summary.json
+
+# List task outputs
+ls runs_12345678/
+
+# Check specific task output
+cat runs_12345678/run_1/stdout.txt
+cat runs_12345678/run_1/stderr.txt
+```
+
+---
 
 ## Troubleshooting
 
-### Tasks Failing
+### "tasks.json not found"
 
-Check task stderr:
+You need to generate tasks before submitting:
 ```bash
-cat runs_JOBID/task_001/stderr.txt
+python examples/simple_tasks.py
 ```
 
-### No Output
+### Job stuck in queue
 
-Verify Python path:
-```bash
-which python3
-python3 --version
-```
-
-### Database Locked
-
-Previous job still running:
+Check queue status and limits:
 ```bash
 squeue -u $USER
-scancel JOBID
+sacctmgr show qos   # Check QoS limits
 ```
 
-## Examples
+### Tasks failing
 
-| Example | Command |
-|---------|---------|
-| Simple test | `python examples/simple_tasks.py` |
-| Parameter sweep | `python examples/parameter_sweep.py` |
-| Dynamic/adaptive | `python examples/dynamic_tasks.py` |
-| LAMMPS | `python examples/lammps_active_learning.py` |
+Check individual task stderr:
+```bash
+cat runs_*/task_name/stderr.txt
+```
 
-## LAMMPS Setup
+### "python: command not found"
 
-The LAMMPS example requires LAMMPS with MPI support. The recommended approach is conda:
+Add Python to your submit.sh:
+```bash
+module load python/3.9
+# or
+source /path/to/conda/etc/profile.d/conda.sh
+conda activate base
+```
 
-### 1. Install LAMMPS via Conda
+### Resume after timeout
+
+If your job times out, resume from where it left off:
+```bash
+# Edit submit.sh to add --resume flag and use the existing database
+python3 pilot.py --cores $SLURM_NTASKS --db state_OLDJOBID.db --resume
+```
+
+---
+
+## LAMMPS-Specific Setup
+
+### Install LAMMPS via Conda
 
 ```bash
-# On your HPC cluster
+# On your cluster
 conda create -n lammps_env -c conda-forge lammps -y
 conda activate lammps_env
 
 # Verify
 lmp -h | head -3
-mpirun --version
+which mpirun
 ```
 
-### 2. Find Your Conda Path
+### Find your conda path
 
 ```bash
 conda info --base
-# Example output: /home/user/miniconda3
-# Or: /projects/user/software/miniconda3
+# Example: /home/user/miniconda3
 ```
 
-### 3. Update Submit Script
+### Update submit.sh
 
-Edit `submit_atesting.sh` or create your own:
-
+Uncomment and edit the conda lines:
 ```bash
-#!/bin/bash
-#SBATCH --partition=your_partition
-#SBATCH --qos=your_qos
-#SBATCH --nodes=1
-#SBATCH --ntasks=8
-#SBATCH --time=1:00:00
-#SBATCH --output=pilot_%j.out
-#SBATCH --error=pilot_%j.err
-
-# IMPORTANT: Update this path to your conda installation
-source /path/to/miniconda3/etc/profile.d/conda.sh
+source /home/user/miniconda3/etc/profile.d/conda.sh
 conda activate lammps_env
-
-cd $SLURM_SUBMIT_DIR
-
-# Generate LAMMPS tasks
-python3 examples/lammps_active_learning.py
-
-# Run scheduler (8 cores total, max 4 concurrent tasks)
-python3 pilot.py \
-    --cores $SLURM_NTASKS \
-    --tasks tasks.json \
-    --workdir ./runs_$SLURM_JOB_ID \
-    --db state_$SLURM_JOB_ID.db \
-    --max-workers 4
 ```
 
-### 4. Submit
+### Generate LAMMPS tasks
 
 ```bash
-sbatch submit_atesting.sh
-tail -f pilot_*.err  # Scheduler output goes to stderr
+conda activate lammps_env
+python examples/lammps_active_learning.py
+sbatch submit.sh
 ```
 
-### Expected Output
+---
 
-```
-▶ exploration_T80p0 (2c) [6/8 free]
-▶ exploration_T100p0 (2c) [4/8 free]
-▶ exploration_T120p0 (2c) [2/8 free]
-✓ exploration_T120p0 (8.3s)
-▶ exploration_T110p0 (2c)
-...
-PILOT FINISHED
-  Completed: 5
-  Failed: 0
-  Wall time: 12.7s
-  CPU time: 41.7s
-```
+## Quick Reference
+
+| Step | Command |
+|------|---------|
+| Edit config | `nano submit.sh` |
+| Transfer files | `scp -r allocation-scheduler/ user@cluster:/scratch/user/` |
+| Generate tasks | `python examples/simple_tasks.py` |
+| Submit job | `sbatch submit.sh` |
+| Check status | `squeue -u $USER` |
+| View output | `tail -f pilot_*.out` |
+| Check results | `cat runs_*/summary.json` |
