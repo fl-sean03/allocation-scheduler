@@ -18,6 +18,38 @@ One big job → Queue (2h) → Run 100+ tasks internally → Done
 Total time: ~2h queue + actual compute time
 ```
 
+## What is a Task?
+
+A **Task** is what would traditionally be a separate `sbatch` submission.
+
+**Traditional SLURM** (each run is a separate job):
+```bash
+sbatch run_T80.sh   →  Queue  →  Run simulation at T=80K
+sbatch run_T90.sh   →  Queue  →  Run simulation at T=90K
+sbatch run_T100.sh  →  Queue  →  Run simulation at T=100K
+# Each waits in queue independently
+```
+
+**Allocation Scheduler** (runs are tasks inside one job):
+```bash
+sbatch submit.sh    →  Queue  →  ┌─────────────────────────┐
+                                 │  Your Allocation        │
+                                 │  ├── Task: T=80K        │
+                                 │  ├── Task: T=90K        │
+                                 │  └── Task: T=100K       │
+                                 └─────────────────────────┘
+# One queue wait, tasks run inside
+```
+
+**Mapping traditional jobs to tasks:**
+
+| Traditional SLURM | Allocation Scheduler Task |
+|-------------------|---------------------------|
+| `sbatch run_T80.sh` (runs `mpirun -np 2 lmp -in T80.in`) | `{"id": "T80", "command": "mpirun -np 2 lmp -in T80.in", "cores": 2}` |
+| `sbatch run_T90.sh` (runs `mpirun -np 2 lmp -in T90.in`) | `{"id": "T90", "command": "mpirun -np 2 lmp -in T90.in", "cores": 2}` |
+
+The scheduler handles starting tasks, tracking completion, and cycling new tasks as cores free up—the same job management SLURM does across separate submissions, but now inside one allocation.
+
 ## Features
 
 - **Zero dependencies** - Python standard library only
@@ -83,40 +115,26 @@ Tasks are defined in `tasks.json`:
 | `priority` | No | Higher = runs first (default: 0) |
 | `max_retries` | No | Retry count on failure (default: 0) |
 
-## CLI Usage
+## Advanced: Customizing pilot.py
+
+The `submit.sh` script calls `pilot.py` internally. If you need to customize behavior, edit the `python pilot.py ...` line in `submit.sh`:
 
 ```bash
-python pilot.py --cores 8 --tasks tasks.json [OPTIONS]
+python pilot.py --cores $SLURM_NTASKS --tasks tasks.json [OPTIONS]
 
 Options:
-  --cores N          Total cores available (required)
-  --tasks FILE       Path to tasks.json (required unless --resume)
+  --cores N          Total cores available
+  --tasks FILE       Path to tasks.json
   --workdir DIR      Output directory (default: ./pilot_runs)
-  --db FILE          SQLite database for state persistence
+  --db FILE          SQLite database for crash recovery
   --resume           Resume from existing database
   --max-workers N    Max concurrent tasks (default: cores)
 ```
 
-## Examples
-
-### Generate and Run Simple Tasks
+**Local testing** (before submitting to cluster):
 ```bash
 python examples/simple_tasks.py
 python pilot.py --cores 4 --tasks tasks.json
-```
-
-### Parameter Sweep
-```bash
-python examples/parameter_sweep.py
-python pilot.py --cores 8 --tasks tasks.json
-```
-
-### With Crash Recovery
-```bash
-python pilot.py --cores 8 --tasks tasks.json --db state.db
-
-# If interrupted, resume with:
-python pilot.py --cores 8 --db state.db --resume
 ```
 
 ## LAMMPS Setup
