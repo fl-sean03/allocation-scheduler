@@ -79,7 +79,7 @@ allocation-scheduler/
 │   ├── simple_tasks.py         # Basic demo tasks
 │   ├── parameter_sweep.py      # Parameter sweep pattern
 │   ├── dynamic_tasks.py        # Adaptive/callback example
-│   └── lammps_active_learning.py  # LAMMPS MD example
+│   └── lammps_adaptive_sweep.py   # LAMMPS MD example
 └── tests/
     └── test_local.py           # Local validation
 ```

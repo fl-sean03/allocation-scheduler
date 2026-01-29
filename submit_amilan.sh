@@ -59,7 +59,7 @@ if [ -f "tasks.json" ]; then
     echo "Using existing tasks.json"
 else
     echo "Generating tasks..."
-    python3 examples/lammps_active_learning.py
+    python3 examples/lammps_adaptive_sweep.py
 fi
 
 # Run pilot scheduler

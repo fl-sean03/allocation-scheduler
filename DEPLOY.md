@@ -109,7 +109,7 @@ python examples/parameter_sweep.py
 # Activate your LAMMPS environment first
 conda activate lammps_env  # or load modules
 
-python examples/lammps_active_learning.py
+python examples/lammps_adaptive_sweep.py
 ```
 
 **Option D: Create tasks.json manually**
@@ -282,7 +282,7 @@ conda activate lammps_env
 
 ```bash
 conda activate lammps_env
-python examples/lammps_active_learning.py
+python examples/lammps_adaptive_sweep.py
 sbatch submit.sh
 ```
 

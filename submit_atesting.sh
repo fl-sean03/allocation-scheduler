@@ -32,7 +32,7 @@ echo ""
 cd $SLURM_SUBMIT_DIR
 
 # Generate initial tasks
-python3 examples/lammps_active_learning.py
+python3 examples/lammps_adaptive_sweep.py
 
 # Run pilot scheduler
 python3 pilot.py \

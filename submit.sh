@@ -13,7 +13,7 @@
 #   1. Generate tasks.json first:
 #      python examples/simple_tasks.py          # Basic test
 #      python examples/parameter_sweep.py       # Parameter sweep
-#      python examples/lammps_active_learning.py  # LAMMPS (requires conda env)
+#      python examples/lammps_adaptive_sweep.py   # LAMMPS (requires conda env)
 #
 #   2. Edit this script for your cluster:
 #      - Set --partition
@@ -59,7 +59,7 @@ if [ ! -f "tasks.json" ]; then
     echo "Generate tasks first using one of:"
     echo "  python examples/simple_tasks.py"
     echo "  python examples/parameter_sweep.py"
-    echo "  python examples/lammps_active_learning.py"
+    echo "  python examples/lammps_adaptive_sweep.py"
     echo ""
     echo "Or create tasks.json manually. See README.md for format."
     exit 1

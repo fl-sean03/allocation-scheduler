@@ -8,7 +8,7 @@ Demonstrates:
 3. Parallel execution on HPC
 
 Usage:
-    python lammps_active_learning.py  # Generates tasks.json and input template
+    python lammps_adaptive_sweep.py  # Generates tasks.json and input template
     python pilot.py --cores 8 --tasks tasks.json --db state.db
 """
 
@@ -253,7 +253,7 @@ def main():
     # Write callback module
     callback_path = Path(__file__).parent.parent / "active_learning_callback.py"
     callback_code = '''"""Active learning callback - import into pilot."""
-from examples.lammps_active_learning import on_task_complete
+from examples.lammps_adaptive_sweep import on_task_complete
 '''
     with open(callback_path, 'w') as f:
         f.write(callback_code)
